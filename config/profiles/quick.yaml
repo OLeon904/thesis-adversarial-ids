@@ -1,0 +1,9 @@
+# Quick pilot profile: small data load, capped attack eval, single adv-training pass.
+data:
+  max_rows: 50000
+
+attacks:
+  max_test_samples: 10000
+
+adversarial_training:
+  passes: 1

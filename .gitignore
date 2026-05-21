@@ -1,0 +1,46 @@
+# Data (too large for git)
+data/raw/
+data/processed/
+*.csv
+*.parquet
+
+# Artifacts
+results/
+checkpoints/
+logs/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
+.venv/
+venv/
+.env
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local-only notes + Cursor rules (not for GitHub)
+.local/
+.cursor/
+
+# Thesis manuscript / professor materials (kept in ../thesis-writing/, not on GitHub)
+docs/THESIS_*
+docs/IEEE_*
+docs/ROBUSTNESS*
+docs/DEFENSE*
+docs/MILESTONE*
+docs/EVALUATION_PROTOCOL.md
+docs/THESIS_PIPELINE.mmd
+scripts/generate_thesis_results.py
+scripts/generate_ieee_tables.py
+scripts/compare_robustness.py
+scripts/insert_results_docx.py
+scripts/create_professor_update_docx.py
+scripts/refresh_thesis_deliverables.py
+config/thesis_results_runs.yaml

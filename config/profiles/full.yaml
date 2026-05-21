@@ -1,0 +1,10 @@
+# Full thesis run: entire dataset, full test attack eval, all adv-training passes.
+data:
+  max_rows: null
+  max_train_samples: null
+
+attacks:
+  max_test_samples: null
+
+adversarial_training:
+  passes: 3

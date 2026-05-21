@@ -1,0 +1,60 @@
+seed: 42
+paths:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  results_dir: results
+  baseline_run: null  # user sets latest baseline run id
+
+data:
+  label_column: Label
+  drop_columns:
+    - Flow ID
+    - Source IP
+    - Destination IP
+    - Source Port
+    - Timestamp
+  # Pilot: cap rows for quick runtime measurement (null = use all)
+  max_rows: null
+  pilot_max_rows: 50000
+  # Cap training rows after split (null = all train rows). Test/val unchanged.
+  max_train_samples: 500000
+
+split:
+  train_ratio: 0.70
+  val_ratio: 0.10
+  test_ratio: 0.20
+
+models:
+  rf:
+    n_estimators: 300
+    max_depth: 24
+    min_samples_leaf: 2
+    n_jobs: -1
+    class_weight: balanced
+  mlp:
+    hidden_dims: [256, 128, 64]
+    dropout: 0.2
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    batch_size: 512
+    epochs: 30
+    early_stopping_patience: 5
+
+attacks:
+  epsilon_values: [0.005, 0.01, 0.02]
+  pgd:
+    alpha: 0.002
+    steps: 7
+    steps_eval: 10
+  batch_size: 256
+  max_test_samples: 100000  # thesis protocol; full test run: 20260520T194413Z (566149 rows, set null)
+
+constraints:
+  mode: relaxed  # strict | relaxed
+  max_perturbation_ratio: 0.20
+
+adversarial_training:
+  passes: 3
+  mix_ratio: 0.3
+  epsilon: 0.01
+  pgd_steps: 5
