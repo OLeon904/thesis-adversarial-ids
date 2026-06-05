@@ -28,19 +28,23 @@ from typing import Any, Literal
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from sklearn.metrics import accuracy_score, f1_score
 
 from src.attack_metrics import attack_success_rate, save_attack_results
+from src.attacks.fgsm import fgsm_attack
+from src.attacks.pgd import pgd_attack
+from src.constraints_torch import make_constraint_fn
 from src.io_utils import (
     find_latest_baseline_run,
     load_mlp_checkpoint,
     load_processed_data,
     load_rf_checkpoint,
+    load_scaler_label_encoder,
 )
 from src.models.mlp import MLPClassifier
 
 AttackName = Literal["fgsm", "pgd"]
+ConstraintModeName = Literal["unconstrained", "constrained"]
 
 __all__ = [
     "resolve_baseline_run",
@@ -104,40 +108,6 @@ def load_x_adv(path: Path | str) -> np.ndarray:
     return np.asarray(np.load(p))
 
 
-def _fgsm_batch(
-    model: MLPClassifier,
-    xb: torch.Tensor,
-    yb: torch.Tensor,
-    epsilon: float,
-) -> torch.Tensor:
-    xb = xb.detach().clone().requires_grad_(True)
-    logits = model(xb)
-    loss = F.cross_entropy(logits, yb)
-    loss.backward()
-    return (xb + epsilon * xb.grad.sign()).detach()
-
-
-def _pgd_batch(
-    model: MLPClassifier,
-    xb: torch.Tensor,
-    yb: torch.Tensor,
-    epsilon: float,
-    alpha: float,
-    steps: int,
-) -> torch.Tensor:
-    x_nat = xb.detach()
-    x_adv = x_nat.clone()
-    for _ in range(steps):
-        x_adv = x_adv.detach().requires_grad_(True)
-        logits = model(x_adv)
-        loss = F.cross_entropy(logits, yb)
-        loss.backward()
-        x_adv = x_adv + alpha * x_adv.grad.sign()
-        delta = torch.clamp(x_adv - x_nat, -epsilon, epsilon)
-        x_adv = (x_nat + delta).detach()
-    return x_adv
-
-
 def generate_mlp_adversarial(
     model: MLPClassifier,
     X: np.ndarray,
@@ -146,38 +116,48 @@ def generate_mlp_adversarial(
     attack: AttackName,
     epsilon: float,
     cfg: dict[str, Any],
+    *,
+    constraint_mode: ConstraintModeName = "unconstrained",
+    constraint_fn: Any | None = None,
 ) -> np.ndarray:
-    """Craft unconstrained L_inf adversarial examples against the MLP surrogate."""
+    """Craft L_inf adversarial examples against the MLP (optional raw-space projection)."""
     acfg = cfg["attacks"]
     batch_size = int(acfg["batch_size"])
     pgd_cfg = acfg["pgd"]
+    cfn = constraint_fn if constraint_mode == "constrained" else None
 
     model.eval()
-    chunks: list[np.ndarray] = []
+    x_tensor = torch.from_numpy(X).float()
+    y_tensor = torch.from_numpy(y).long()
 
-    for start in range(0, len(y), batch_size):
-        end = min(start + batch_size, len(y))
-        xb = torch.from_numpy(X[start:end]).float().to(device)
-        yb = torch.from_numpy(y[start:end]).long().to(device)
+    if attack == "fgsm":
+        adv = fgsm_attack(
+            model,
+            x_tensor,
+            y_tensor,
+            epsilon,
+            device,
+            constraint_fn=cfn,
+            chunk_size=batch_size,
+        )
+    elif attack == "pgd":
+        steps = int(pgd_cfg.get("steps_eval", pgd_cfg["steps"]))
+        adv = pgd_attack(
+            model,
+            x_tensor,
+            y_tensor,
+            epsilon=epsilon,
+            alpha=float(pgd_cfg["alpha"]),
+            steps=steps,
+            device=device,
+            random_start=True,
+            constraint_fn=cfn,
+            batch_size=batch_size,
+        )
+    else:
+        raise ValueError(f"Unknown attack: {attack!r}")
 
-        if attack == "fgsm":
-            adv = _fgsm_batch(model, xb, yb, epsilon)
-        elif attack == "pgd":
-            steps = int(pgd_cfg.get("steps_eval", pgd_cfg["steps"]))
-            adv = _pgd_batch(
-                model,
-                xb,
-                yb,
-                epsilon,
-                float(pgd_cfg["alpha"]),
-                steps,
-            )
-        else:
-            raise ValueError(f"Unknown attack: {attack!r}")
-
-        chunks.append(adv.cpu().numpy())
-
-    return np.vstack(chunks)
+    return adv.cpu().numpy()
 
 
 def evaluate_rf_transfer(
@@ -242,6 +222,7 @@ def run_rf_transfer(
     baseline_run: str | None = None,
     attack: AttackName = "fgsm",
     epsilon: float | None = None,
+    constraint_mode: ConstraintModeName = "unconstrained",
     x_adv_path: Path | str | None = None,
     pilot: bool = False,
     save_x_adv: bool = True,
@@ -258,6 +239,13 @@ def run_rf_transfer(
     processed_dir = Path(cfg["paths"]["processed_dir"])
     splits, meta = load_processed_data(processed_dir)
     label_names = meta["class_names"]
+    feature_groups = meta.get("feature_groups", {})
+    scaler, _ = load_scaler_label_encoder(processed_dir)
+    constraint_fn = None
+    if constraint_mode == "constrained":
+        constraint_fn = make_constraint_fn(
+            meta["feature_names"], feature_groups, cfg, scaler=scaler
+        )
 
     max_test = cfg["attacks"].get("max_test_samples")
     if pilot and max_test is not None:
@@ -294,10 +282,18 @@ def run_rf_transfer(
     else:
         mlp, _ = load_mlp_checkpoint(mlp_path, device)
         x_adv = generate_mlp_adversarial(
-            mlp, X_eval, y_eval, device, attack, eps, cfg
+            mlp,
+            X_eval,
+            y_eval,
+            device,
+            attack,
+            eps,
+            cfg,
+            constraint_mode=constraint_mode,
+            constraint_fn=constraint_fn,
         )
         if save_x_adv:
-            adv_file = out_dir / f"x_adv_{attack}_eps{eps:g}.npy"
+            adv_file = out_dir / f"x_adv_{attack}_{constraint_mode}_eps{eps:g}.npy"
             np.save(adv_file, x_adv)
             np.save(out_dir / "eval_indices.npy", eval_indices)
 
@@ -308,6 +304,7 @@ def run_rf_transfer(
         "baseline_run": baseline_dir.name,
         "baseline_dir": str(baseline_dir),
         "attack": attack_used,
+        "constraint_mode": constraint_mode,
         "epsilon": eps,
         "device": str(device),
         "n_samples": int(len(y_eval)),

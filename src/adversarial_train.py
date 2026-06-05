@@ -198,6 +198,7 @@ def run_adversarial_training(
     passes: int | None = None,
     baseline_run: str | None = None,
     pilot: bool = False,
+    constrained: bool = False,
 ) -> Path:
     """Run multi-pass adversarial training; checkpoints under ``results/adv_train/<run_id>/``."""
     processed_dir = Path(cfg["paths"]["processed_dir"])
@@ -205,6 +206,16 @@ def run_adversarial_training(
 
     splits, metadata = load_processed_data(processed_dir)
     n_classes = metadata["n_classes"]
+    constraint_fn = None
+    if constrained:
+        from src.constraints_torch import make_constraint_fn
+        from src.io_utils import load_scaler_label_encoder
+
+        scaler, _ = load_scaler_label_encoder(processed_dir)
+        feature_groups = metadata.get("feature_groups", {})
+        constraint_fn = make_constraint_fn(
+            metadata["feature_names"], feature_groups, cfg, scaler=scaler
+        )
 
     max_train = cfg["data"].get("max_train_samples")
     if pilot:
@@ -236,6 +247,8 @@ def run_adversarial_training(
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     if pilot:
         run_id = f"pilot_{run_id}"
+    if constrained:
+        run_id = f"constrained_{run_id}"
     out_run = results_dir / "adv_train" / run_id
     out_run.mkdir(parents=True, exist_ok=True)
 
@@ -251,7 +264,7 @@ def run_adversarial_training(
             splits["y_val"],
             cfg,
             device,
-            constraint_fn=None,
+            constraint_fn=constraint_fn,
             save_path=save_path,
         )
         ckpt = torch.load(save_path, map_location="cpu", weights_only=False)
@@ -273,6 +286,7 @@ def run_adversarial_training(
         "passes": n_passes,
         "train_rows_used": int(len(y_train)),
         "adversarial_training": cfg["adversarial_training"],
+        "constrained_inner_pgd": constrained,
         "pass_metrics": pass_metrics,
         "n_classes": n_classes,
         "checkpoint_meta": {k: v for k, v in ckpt_meta.items() if k != "state_dict"},

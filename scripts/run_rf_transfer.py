@@ -35,6 +35,12 @@ def main() -> None:
         help="L_inf radius (default: first value in config attacks.epsilon_values)",
     )
     parser.add_argument(
+        "--mode",
+        choices=("unconstrained", "constrained"),
+        default="unconstrained",
+        help="MLP attack mode before RF evaluation (default: unconstrained)",
+    )
+    parser.add_argument(
         "--x-adv-path",
         type=Path,
         default=None,
@@ -59,6 +65,7 @@ def main() -> None:
         baseline_run=args.baseline_run,
         attack=args.attack,
         epsilon=args.epsilon,
+        constraint_mode=args.mode,
         x_adv_path=args.x_adv_path,
         pilot=args.pilot,
         save_x_adv=not args.no_save_x_adv,

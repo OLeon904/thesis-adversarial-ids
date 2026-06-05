@@ -35,6 +35,11 @@ def main() -> None:
         help="Cap training rows for a fast pilot run",
     )
     parser.add_argument(
+        "--constrained",
+        action="store_true",
+        help="Apply raw-space projection during inner PGD (aligned train/test threat)",
+    )
+    parser.add_argument(
         "--config",
         type=Path,
         default=None,
@@ -49,6 +54,7 @@ def main() -> None:
         passes=args.passes,
         baseline_run=args.baseline_run,
         pilot=args.pilot,
+        constrained=args.constrained,
     )
 
 

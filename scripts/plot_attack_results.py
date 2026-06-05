@@ -250,27 +250,55 @@ def _plot_grouped_bars(
     modes = ["unconstrained", "constrained"]
     x = range(len(epsilons))
     width = 0.35
+    as_percent = metric_key == "asr"
 
     fig, ax = plt.subplots(figsize=(8, 5))
+    all_values: list[float] = []
+    bars_for_labels = []
     for idx, mode in enumerate(modes):
         values = [
             grouped[eps].get(mode, {}).get(metric_key, float("nan"))
             for eps in epsilons
         ]
+        if as_percent:
+            values = [v * 100.0 if v == v else float("nan") for v in values]
+        all_values.extend([v for v in values if v == v])
         offset = (idx - (len(modes) - 1) / 2) * width
-        ax.bar(
+        bar_container = ax.bar(
             [i + offset for i in x],
             values,
             width=width,
             label=mode.replace("_", " ").title(),
         )
+        bars_for_labels.append(bar_container)
+
+    if as_percent and all_values:
+        ymax = max(all_values) * 1.35 + 0.15
+        ax.set_ylim(0.0, min(100.0, max(ymax, 1.0)))
+    else:
+        ax.set_ylim(0.0, 1.0)
+
+    for bar_container in bars_for_labels:
+        for bar in bar_container:
+            h = bar.get_height()
+            if h != h:
+                continue
+            label = f"{h:.2f}%" if as_percent else f"{h:.3f}"
+            ax.annotate(
+                label,
+                xy=(bar.get_x() + bar.get_width() / 2, h),
+                xytext=(0, 3),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
 
     ax.set_xticks(list(x))
     ax.set_xticklabels([str(eps) for eps in epsilons])
     ax.set_xlabel("Epsilon")
     ax.set_ylabel(ylabel)
     ax.set_title(title)
-    ax.set_ylim(0.0, 1.0)
     ax.legend()
     ax.grid(axis="y", linestyle="--", alpha=0.4)
     fig.tight_layout()
@@ -308,6 +336,8 @@ def _plot_adv_eval_lines(
     if n_passes == 1:
         axes = [axes]
 
+    as_percent = metric_key == "asr"
+    all_values: list[float] = []
     for ax, pass_num in zip(axes, passes):
         grouped = grouped_by_pass[pass_num]
         epsilons = sorted(grouped.keys())
@@ -316,6 +346,9 @@ def _plot_adv_eval_lines(
                 grouped[eps].get(mode, {}).get(metric_key, float("nan"))
                 for eps in epsilons
             ]
+            if as_percent:
+                values = [v * 100.0 if v == v else float("nan") for v in values]
+            all_values.extend([v for v in values if v == v])
             ax.plot(
                 epsilons,
                 values,
@@ -325,7 +358,14 @@ def _plot_adv_eval_lines(
         ax.set_xlabel("Epsilon")
         ax.set_ylabel(ylabel)
         ax.set_title(f"Pass {pass_num}")
-        ax.set_ylim(0.0, 1.0)
+    if as_percent and all_values:
+        ymax = max(all_values) * 1.35 + 0.15
+        for ax in axes:
+            ax.set_ylim(0.0, min(100.0, max(ymax, 1.0)))
+    else:
+        for ax in axes:
+            ax.set_ylim(0.0, 1.0)
+    for ax in axes:
         ax.legend()
         ax.grid(True, linestyle="--", alpha=0.4)
 
@@ -367,7 +407,7 @@ def plot_adv_eval_results(run_dir: Path) -> list[Path]:
         _plot_adv_eval_lines(
             grouped_by_pass,
             metric_key="asr",
-            ylabel="Attack Success Rate (ASR)",
+            ylabel="Attack Success Rate (%)",
             title=f"{attack.upper()}: ASR vs Epsilon (Unconstrained vs Constrained)",
             out_path=asr_path,
         )
@@ -404,7 +444,7 @@ def plot_attack_results(run_dir: Path) -> list[Path]:
         _plot_grouped_bars(
             grouped,
             metric_key="asr",
-            ylabel="Attack Success Rate (ASR)",
+            ylabel="Attack Success Rate (%)",
             title=f"{attack.upper()}: Unconstrained vs Constrained ASR by Epsilon",
             out_path=asr_path,
         )
