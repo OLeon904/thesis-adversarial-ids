@@ -85,3 +85,64 @@ def count_raw_violations(
 def summarize_violations(counts: dict[str, int]) -> dict[str, Any]:
     total = sum(counts.values())
     return {"by_rule": counts, "total_violations": total}
+
+
+def audit_scaled_adv_batch(
+    x_adv_scaled: np.ndarray,
+    x_orig_scaled: np.ndarray,
+    *,
+    scaler,
+    feature_names: list[str],
+    groups: dict[str, list[str]],
+    cfg: dict,
+) -> dict[str, Any]:
+    """
+    Count raw-space violations on scaled adversarial outputs (attack path).
+
+    *before_projection*: inverse-transform adversarial points without re-projecting.
+    *after_projection*: apply ``project_batch`` in raw space (sanity check vs constraint hook).
+    """
+    from src.constraints import project_batch
+
+    xa = np.asarray(x_adv_scaled, dtype=np.float64)
+    xo = np.asarray(x_orig_scaled, dtype=np.float64)
+    if xa.shape != xo.shape or xa.ndim != 2:
+        raise ValueError(f"expected matching 2D arrays, got {xa.shape} vs {xo.shape}")
+
+    ccfg = cfg.get("constraints", {})
+    mode = ccfg.get("mode", "relaxed")
+    max_ratio = float(ccfg.get("max_perturbation_ratio", 0.20))
+
+    xa_raw = scaler.inverse_transform(xa)
+    xo_raw = scaler.inverse_transform(xo)
+
+    before = count_raw_violations(
+        xa_raw,
+        xo_raw,
+        feature_names=feature_names,
+        groups=groups,
+        max_perturbation_ratio=max_ratio,
+    )
+    projected_raw = project_batch(
+        xa_raw,
+        xo_raw,
+        groups,
+        feature_names=feature_names,
+        mode=mode,
+        max_perturbation_ratio=max_ratio,
+    )
+    after = count_raw_violations(
+        projected_raw,
+        xo_raw,
+        feature_names=feature_names,
+        groups=groups,
+        max_perturbation_ratio=max_ratio,
+    )
+    return {
+        "n_samples": int(xa.shape[0]),
+        "n_features": int(xa.shape[1]),
+        "constraints_mode": mode,
+        "max_perturbation_ratio": max_ratio,
+        "before_projection": summarize_violations(before),
+        "after_projection": summarize_violations(after),
+    }

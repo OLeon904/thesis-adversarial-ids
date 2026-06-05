@@ -43,4 +43,4 @@ scripts/compare_robustness.py
 scripts/insert_results_docx.py
 scripts/create_professor_update_docx.py
 scripts/refresh_thesis_deliverables.py
-config/thesis_results_runs.yaml
+# config/thesis_results_runs.yaml — tracked for thesis reproducibility

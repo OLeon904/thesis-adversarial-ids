@@ -1,0 +1,18 @@
+# Pinned run IDs for thesis results (June 2026).
+# Artifact paths: results/<stage>/<run_id>/ (attacks under results/attacks/).
+
+description: Thesis evaluation runs — June 2026
+
+runs:
+  baselines: 20260520T192855Z
+  attacks_100k: 20260520T220532Z          # max_test_samples: 100000
+  attacks_full_test: 20260520T220618Z     # max_test_samples: null (566149 rows)
+  adv_train: 20260520T193255Z
+  adv_eval: adv_eval_20260520T193255Z
+  rf_transfer: 20260520T231047Z           # --mode unconstrained
+  rf_transfer_constrained: 20260605T004611Z
+  adv_train_constrained_pilot: constrained_20260605T004621Z  # 1-pass pilot
+  adv_eval_constrained_pilot: adv_eval_constrained_20260605T004621Z
+  adv_train_constrained: constrained_20260605T010438Z
+  adv_eval_constrained: adv_eval_constrained_20260605T010438Z
+  multi_seed_headline: headline_20260605T010708Z

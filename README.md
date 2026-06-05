@@ -48,6 +48,10 @@ py -3 scripts/validate_results.py
 
 See [docs/RUNBOOK.md](docs/RUNBOOK.md) for full commands, config profiles, and 100k vs full-test evaluation.
 
+### Thesis pinned runs
+
+Manuscript run IDs (baselines, attacks, adv train/eval, RF transfer) are pinned in [`config/thesis_results_runs.yaml`](config/thesis_results_runs.yaml). Use those ids with `--run-id`, `--adv-run`, and `--baseline-run` when reproducing thesis figures and tables.
+
 **Physical-feasibility constraints:** Constrained FGSM/PGD project perturbations in **raw CICFlowMeter units** (`inverse_transform` → `project_batch` → `transform`) before each MLP forward pass—not only in StandardScaler space.
 
 **Training note:** `config/default.yaml` sets `max_train_samples: 500000` for CPU-friendly baseline training. Set to `null` for the full training split.
