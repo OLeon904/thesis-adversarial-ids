@@ -2,6 +2,8 @@
 
 CICIDS2017 flow CSV experiments: **Random Forest** + **MLP**, **FGSM/PGD** with optional physical-feasibility constraints in raw feature space, **adversarial training**, and **RF transfer** evaluation.
 
+**Authoritative reproduction guide:** [docs/RUNBOOK.md](docs/RUNBOOK.md). Compiled metrics: [docs/THESIS_RESULTS.md](docs/THESIS_RESULTS.md). Pinned run IDs: [`config/thesis_results_runs.yaml`](config/thesis_results_runs.yaml).
+
 ## Quick start
 
 ### 1. Environment
@@ -28,62 +30,44 @@ py -3 scripts/run_preprocess.py
 py -3 scripts/run_baselines.py
 ```
 
-Pilot (50k rows):
+Default protocol: `max_train_samples: 500000`, `attacks.max_test_samples: 100000`. Full test: set `max_test_samples: null` (pinned run `20260520T220618Z`).
 
-```powershell
-py -3 scripts/run_preprocess.py --pilot
-py -3 scripts/run_baselines.py --pilot
-```
-
-### 4. Attacks, adversarial training, RF transfer
+### 4. Final workflow (thesis)
 
 ```powershell
 py -3 scripts/run_attacks.py --mode both
 py -3 scripts/run_adversarial_training.py
 py -3 scripts/eval_adv_trained_attacks.py --adv-run <adv_run_id> --passes 3 --mode both
-py -3 scripts/run_rf_transfer.py --epsilon 0.01
+py -3 scripts/run_rf_transfer.py --mode unconstrained
+py -3 scripts/run_rf_transfer.py --mode constrained
+py -3 scripts/run_adversarial_training.py --constrained
+py -3 scripts/eval_adv_trained_attacks.py --adv-run <constrained_adv_run_id> --passes 3 --mode both
+py -3 scripts/run_headline_multi_seed.py --seeds 42 43 44 --baseline-run <baseline_run_id>
+py -3 scripts/audit_constraint_violations.py
 py -3 scripts/plot_attack_results.py --run-id <attack_run_id>
 py -3 scripts/validate_results.py
 ```
 
-See [docs/RUNBOOK.md](docs/RUNBOOK.md) for full commands, config profiles, and 100k vs full-test evaluation.
-
-### Thesis pinned runs
-
-Manuscript run IDs (baselines, attacks, adv train/eval, RF transfer) are pinned in [`config/thesis_results_runs.yaml`](config/thesis_results_runs.yaml). Use those ids with `--run-id`, `--adv-run`, and `--baseline-run` when reproducing thesis figures and tables.
-
-**Physical-feasibility constraints:** Constrained FGSM/PGD project perturbations in **raw CICFlowMeter units** (`inverse_transform` → `project_batch` → `transform`) before each MLP forward pass—not only in StandardScaler space.
-
-**Training note:** `config/default.yaml` sets `max_train_samples: 500000` for CPU-friendly baseline training. Set to `null` for the full training split.
+**Physical-feasibility constraints:** Constrained FGSM/PGD project in **raw CICFlowMeter units** (`inverse_transform` → `project_batch` → `transform`) before each MLP forward pass.
 
 ### Config profiles
-
-Profiles under `config/profiles/` merge onto `config/default.yaml`. Use `--config` or `THESIS_CONFIG`:
 
 ```powershell
 $env:THESIS_CONFIG = "config/profiles/quick.yaml"
 py -3 scripts/run_preprocess.py
-py -3 scripts/run_baselines.py
 Remove-Item Env:THESIS_CONFIG
 ```
 
 ## Repository layout
 
 ```
-config/default.yaml     # hyperparameters and paths
+config/default.yaml     # hyperparameters (100k test default)
 config/profiles/        # quick / full overrides
 src/                    # preprocessing, models, attacks, constraints
 scripts/                # CLI entry points
-docs/RUNBOOK.md         # reproduction guide
+docs/RUNBOOK.md         # full reproduction guide
+docs/THESIS_RESULTS.md  # compiled metric tables
 data/raw/               # CICIDS2017 CSVs (gitignored)
 data/processed/         # splits, scaler (gitignored)
 results/                # metrics JSON (gitignored)
 ```
-
-## Implementation roadmap
-
-1. Preprocessing + stratified split + baseline RF/MLP
-2. FGSM/PGD (unconstrained + raw-space constrained)
-3. Constraint layer (mask, integer projection, IAT–duration)
-4. Adversarial training + post-training attack eval
-5. Transfer attacks to RF (MLP-generated FGSM)

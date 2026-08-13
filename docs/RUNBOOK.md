@@ -28,10 +28,9 @@ cd "c:\Users\Leon\Documents\College Courses\Thesis Course\thesis-adversarial-ids
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 py -3 -m pip install -r requirements.txt
-py -3 -m pip install huggingface_hub
 ```
 
-`huggingface_hub` is required by `scripts/download_cicids2017.py` but not listed in `requirements.txt`.
+`huggingface_hub` is included in `requirements.txt` (needed by `scripts/download_cicids2017.py`).
 
 Optional quick sanity check (synthetic data, **not** for thesis numbers):
 
@@ -72,7 +71,7 @@ Edit `config/default.yaml` before long runs:
 | `data.max_train_samples` | `500000` | `null` (all ~1.98M train rows) |
 | `attacks.max_test_samples` | `100000` | `null` (all 566,149 test rows) |
 
-Current repo default has `attacks.max_test_samples: null` (full test). For a **100,000** stratified test subsample, set `attacks.max_test_samples: 100000` in `config/default.yaml`. See §9 and §13.
+Current repo default has `attacks.max_test_samples: 100000` (primary thesis protocol). For the full 566,149-row test set, set `attacks.max_test_samples: null` (pinned full-test attack run: `20260520T220618Z`). See §9 and §13.
 
 Training cap note (from README): `max_train_samples: 500000` keeps baseline training on CPU to roughly **2–3 hours**; `null` is much slower without a GPU.
 
@@ -297,6 +296,9 @@ All manuscript run IDs are recorded in [`config/thesis_results_runs.yaml`](../co
 | `adv_eval` | `adv_eval_20260520T193255Z` |
 | `rf_transfer` | `20260520T231047Z` |
 | `rf_transfer_constrained` | `20260605T004611Z` |
+| `adv_train_constrained` | `constrained_20260605T010438Z` |
+| `adv_eval_constrained` | `adv_eval_constrained_20260605T010438Z` |
+| `multi_seed_headline` | `headline_20260605T010708Z` |
 | `adv_train_constrained_pilot` | `constrained_20260605T004621Z` (1-pass pilot) |
 | `adv_eval_constrained_pilot` | `adv_eval_constrained_20260605T004621Z` |
 
@@ -352,6 +354,7 @@ cd "c:\Users\Leon\Documents\College Courses\Thesis Course\thesis-adversarial-ids
 py -3 scripts/download_cicids2017.py
 
 # 2. Set config: max_train_samples: 500000, max_test_samples: 100000
+#    (full test: max_test_samples: null → pinned attacks_full_test 20260520T220618Z)
 
 # 3. Pipeline
 py -3 scripts/run_preprocess.py
@@ -360,6 +363,10 @@ py -3 scripts/run_attacks.py --mode both
 py -3 scripts/run_adversarial_training.py
 py -3 scripts/eval_adv_trained_attacks.py --adv-run <adv_run_id> --passes 3 --mode both
 py -3 scripts/run_rf_transfer.py --mode unconstrained
+py -3 scripts/run_rf_transfer.py --mode constrained
+py -3 scripts/run_adversarial_training.py --constrained
+py -3 scripts/eval_adv_trained_attacks.py --adv-run <constrained_adv_run_id> --passes 3 --mode both
+py -3 scripts/run_headline_multi_seed.py --seeds 42 43 44 --baseline-run <baseline_run_id>
 py -3 scripts/audit_constraint_violations.py
 
 # 4. Plots + validation

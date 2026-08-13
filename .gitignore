@@ -30,7 +30,10 @@ Thumbs.db
 .cursor/
 
 # Thesis manuscript / professor materials (kept in ../thesis-writing/, not on GitHub)
+# Writing artifacts (generated locally into thesis-writing / course folder)
 docs/THESIS_*
+# Exception: keep compiled results table in the public repo for reproducibility
+!docs/THESIS_RESULTS.md
 docs/IEEE_*
 docs/ROBUSTNESS*
 docs/DEFENSE*

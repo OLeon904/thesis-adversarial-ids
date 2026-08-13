@@ -47,7 +47,7 @@ attacks:
     steps: 7
     steps_eval: 10
   batch_size: 256
-  max_test_samples: 100000  # thesis protocol; full test run: 20260520T194413Z (566149 rows, set null)
+  max_test_samples: 100000  # thesis protocol; full test run: 20260520T220618Z (566149 rows, set null)
 
 constraints:
   mode: relaxed  # strict | relaxed
